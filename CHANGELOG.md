@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.10] - 2026-05-12
+
+### Bug Fixes
+
+- Fixed `skillshare update --all` creating duplicate `.metadata.json` entries with `../../...` relative-path keys when the skills source directory is a symlink or custom location. Existing metadata keys such as `browser/agent-browser` now stay stable during update. Refs: #152
+
 ## [0.19.9] - 2026-05-11
 
 ### New Features

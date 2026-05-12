@@ -182,6 +182,7 @@ func cmdUpdate(args []string) error {
 	if opts.threshold == "" {
 		opts.threshold = cfg.Audit.BlockThreshold
 	}
+	sourcePath := utils.ResolveSymlink(cfg.Source)
 
 	// In JSON mode, redirect all UI output to stderr early so the
 	// header, step, spinner, and handler output don't corrupt stdout.
@@ -208,8 +209,8 @@ func cmdUpdate(args []string) error {
 	if opts.all {
 		// Recursive discovery for --all
 		scanSpinner := ui.StartSpinner("Scanning skills...")
-		walkRoot := utils.ResolveSymlink(cfg.Source)
-		metaStore, _ := install.LoadMetadataWithMigration(cfg.Source, "")
+		walkRoot := sourcePath
+		metaStore, _ := install.LoadMetadataWithMigration(sourcePath, "")
 		err := filepath.Walk(walkRoot, func(path string, info os.FileInfo, err error) error {
 			if err != nil || path == walkRoot {
 				return nil
@@ -255,12 +256,12 @@ func cmdUpdate(args []string) error {
 		}
 	} else {
 		// Load store once for name resolution
-		nameStore, _ := install.LoadMetadata(cfg.Source)
+		nameStore, _ := install.LoadMetadata(sourcePath)
 		// Resolve by specific names/groups
 		for _, name := range opts.names {
 			// Glob pattern matching (e.g. "core-*", "_team-?")
 			if isGlobPattern(name) {
-				globMatches, globErr := resolveByGlob(cfg.Source, name)
+				globMatches, globErr := resolveByGlob(sourcePath, name)
 				if globErr != nil {
 					resolveWarnings = append(resolveWarnings, fmt.Sprintf("%s: %v", name, globErr))
 					continue
@@ -279,8 +280,8 @@ func cmdUpdate(args []string) error {
 				continue
 			}
 
-			if isGroupDir(name, cfg.Source, nameStore) {
-				groupMatches, groupErr := resolveGroupUpdatable(name, cfg.Source)
+			if isGroupDir(name, sourcePath, nameStore) {
+				groupMatches, groupErr := resolveGroupUpdatable(name, sourcePath)
 				if groupErr != nil {
 					resolveWarnings = append(resolveWarnings, fmt.Sprintf("%s: %v", name, groupErr))
 					continue
@@ -299,7 +300,7 @@ func cmdUpdate(args []string) error {
 				continue
 			}
 
-			match, err := resolveByBasename(cfg.Source, name)
+			match, err := resolveByBasename(sourcePath, name)
 			if err != nil {
 				resolveWarnings = append(resolveWarnings, fmt.Sprintf("%s: %v", name, err))
 				continue
@@ -311,7 +312,7 @@ func cmdUpdate(args []string) error {
 		}
 
 		for _, group := range opts.groups {
-			groupMatches, err := resolveGroupUpdatable(group, cfg.Source)
+			groupMatches, err := resolveGroupUpdatable(group, sourcePath)
 			if err != nil {
 				resolveWarnings = append(resolveWarnings, fmt.Sprintf("--group %s: %v", group, err))
 				continue
@@ -363,7 +364,7 @@ func cmdUpdate(args []string) error {
 	}
 
 	// --- Execute ---
-	uc := &updateContext{sourcePath: cfg.Source, registryDir: cfg.RegistryDir, opts: opts, parseOpts: parseOptsFromConfig(cfg)}
+	uc := &updateContext{sourcePath: sourcePath, registryDir: cfg.RegistryDir, opts: opts, parseOpts: parseOptsFromConfig(cfg)}
 
 	if len(targets) == 1 {
 		// Single target: verbose path

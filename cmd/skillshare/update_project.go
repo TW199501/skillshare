@@ -37,7 +37,7 @@ func cmdUpdateProject(args []string, root string) (*updateResult, error) {
 		return nil, err
 	}
 
-	sourcePath := runtime.sourcePath
+	sourcePath := utils.ResolveSymlink(runtime.sourcePath)
 	if opts.threshold == "" {
 		opts.threshold = runtime.config.Audit.BlockThreshold
 	}
@@ -188,7 +188,7 @@ func updateAllProjectSkills(uc *updateContext) (*updateResult, error) {
 	var targets []updateTarget
 
 	scanSpinner := ui.StartSpinner("Scanning skills...")
-	walkRoot := utils.ResolveSymlink(uc.sourcePath)
+	walkRoot := uc.sourcePath
 	metaStore, _ := install.LoadMetadataWithMigration(uc.sourcePath, "")
 	err := filepath.Walk(walkRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
