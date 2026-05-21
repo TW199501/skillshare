@@ -9,6 +9,25 @@ All notable changes to skillshare are documented here. For the full commit histo
 
 ---
 
+## [Unreleased]
+
+### New Features
+
+- **Global config `sources:` map** — global mode now accepts the same `sources:` map shipped for project mode in v0.19.15. Override skills, agents, or extras source directories from a single place:
+  ```yaml
+  # ~/.config/skillshare/config.yaml
+  sources:
+    skills: ~/work/skills
+    agents: ~/work/agents
+    extras: ~/work/extras
+  ```
+  Each key is optional. Existing top-level `source:` / `agents_source:` / `extras_source:` fields continue to work unchanged; when both formats are set, `sources.<key>` wins. Fresh `skillshare init -g` writes the new `sources:` shape; existing configs are never auto-rewritten
+
+### Behavior Changes
+
+- **`extras init` no longer silently backfills `extras_source:`** — running `skillshare extras init <name>` on a global config without an explicit extras source used to write the derived `extras_source:` path back into your `config.yaml`. The runtime now resolves the extras parent on the fly, so the legacy field stays empty unless you set it yourself. Same change applies to the equivalent server endpoint (`POST /api/extras`)
+- **`extras source <path>` writes to whichever field the user already configured** — if `sources.extras` is already set, the command updates that key; otherwise it falls back to the legacy `extras_source` field. This prevents the new value from being silently shadowed by `sources.extras`
+
 ## [0.19.15] - 2026-05-20
 
 ### New Features
