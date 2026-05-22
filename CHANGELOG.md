@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.18] - 2026-05-22
+
+### Bug Fixes
+
+- **Tracked repos with a root-level `SKILL.md` are fully supported** — installing a single-skill repo with `--track` (where `SKILL.md` sits at the repo root, not nested) used to report `Found 0 skill(s)`, skip metadata persistence, and omit the repo from `skillshare status` and `skillshare list`. Now the install reports the correct count, writes the tracked entry to `.metadata.json`, and the repo appears in status output with `skill_count: 1`. Cross-machine recovery via metadata works again for this layout. The misleading `Run skillshare sync to distribute skills` next-step hint is also suppressed when the install produced zero skills or agents. Refs: #163
+- **GitLab SSH URLs with nested subgroups now produce a clean tracked-repo name** — `skillshare install git@gitlab.example.com:org/subgroup/my-skills.git --track` previously stored the repo under a directory name containing the subgroup path; the resolved name is now just `my-skills`, matching the existing HTTPS subgroup behavior
+
 ## [0.19.17] - 2026-05-22
 
 ### New Features
