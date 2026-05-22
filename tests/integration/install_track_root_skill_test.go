@@ -116,6 +116,61 @@ func TestInstall_Track_RootSkillMd_WritesMetadata(t *testing.T) {
 	if entry.Branch == "" {
 		t.Errorf("entry.Branch is empty — expected current branch (main)")
 	}
+	if len(entry.FileHashes) == 0 {
+		t.Fatalf("entry.FileHashes is empty — expected tracked root skill hashes")
+	}
+	if _, ok := entry.FileHashes["SKILL.md"]; !ok {
+		t.Errorf("entry.FileHashes missing SKILL.md: %#v", entry.FileHashes)
+	}
+
+	doctorResult := sb.RunCLI("doctor")
+	doctorResult.AssertSuccess(t)
+	doctorResult.AssertOutputNotContains(t, "missing file hashes")
+}
+
+// TestUpdate_Track_RootSkillMd_BackfillsMissingFileHashes verifies that
+// update refreshes metadata for existing tracked root-skill repos installed by
+// versions that wrote source/tracked/branch but no file_hashes.
+func TestUpdate_Track_RootSkillMd_BackfillsMissingFileHashes(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	setupGlobalConfig(sb)
+
+	repoURL := setupBareRepoWithRootSkill(t, sb, "root-backfill")
+
+	installResult := sb.RunCLI("install", repoURL, "--track", "--name", "backfill-tracked")
+	installResult.AssertSuccess(t)
+
+	store, err := install.LoadMetadata(sb.SourcePath)
+	if err != nil {
+		t.Fatalf("failed to load metadata: %v", err)
+	}
+	entry := store.Get("_backfill-tracked")
+	if entry == nil {
+		t.Fatal("metadata entry '_backfill-tracked' missing")
+	}
+	entry.FileHashes = nil
+	if err := store.Save(sb.SourcePath); err != nil {
+		t.Fatalf("failed to save metadata without hashes: %v", err)
+	}
+
+	updateResult := sb.RunCLI("update", "_backfill-tracked")
+	updateResult.AssertSuccess(t)
+
+	store, err = install.LoadMetadata(sb.SourcePath)
+	if err != nil {
+		t.Fatalf("failed to reload metadata: %v", err)
+	}
+	entry = store.Get("_backfill-tracked")
+	if entry == nil {
+		t.Fatal("metadata entry '_backfill-tracked' missing after update")
+	}
+	if len(entry.FileHashes) == 0 {
+		t.Fatalf("entry.FileHashes is empty after update")
+	}
+	if _, ok := entry.FileHashes["SKILL.md"]; !ok {
+		t.Errorf("entry.FileHashes missing SKILL.md after update: %#v", entry.FileHashes)
+	}
 }
 
 // TestInstall_Track_RootSkillMd_ShowsInStatus verifies that a tracked repo

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.19] - 2026-05-23
+
+### Bug Fixes
+
+- **Tracked root-level `SKILL.md` repos now get integrity hashes** — `skillshare install <repo> --track` for single-skill repos with `SKILL.md` at the repo root now writes `file_hashes` into `.metadata.json`, so `skillshare doctor` can verify them instead of warning that integrity checks are unavailable. Running `skillshare update _repo` also backfills hashes for already-installed tracked root-skill repos that were created by v0.19.18. Refs: #165
+
 ## [0.19.18] - 2026-05-22
 
 ### Bug Fixes

@@ -355,3 +355,55 @@ func (s *MetadataStore) RefreshHashes(relPath, skillPath string) {
 	}
 	entry.FileHashes = hashes
 }
+
+// RefreshTrackedRootSkillHashes recomputes file hashes for tracked repositories
+// that expose a SKILL.md at the repository root.
+func (s *MetadataStore) RefreshTrackedRootSkillHashes(relPath, repoPath string) (bool, error) {
+	if _, err := os.Stat(filepath.Join(repoPath, "SKILL.md")); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	entry := s.GetByPath(relPath)
+	if entry == nil {
+		return false, nil
+	}
+
+	hashes, err := ComputeFileHashes(repoPath)
+	if err != nil {
+		return false, err
+	}
+	if stringMapsEqual(entry.FileHashes, hashes) {
+		return false, nil
+	}
+	entry.FileHashes = hashes
+	return true, nil
+}
+
+// RefreshTrackedRootSkillMetadata loads the metadata store, refreshes hashes
+// for a tracked root-skill repo, and saves only when metadata changed.
+func RefreshTrackedRootSkillMetadata(sourceDir, relPath, repoPath string) error {
+	store, err := LoadMetadataWithMigration(sourceDir, "")
+	if err != nil {
+		return err
+	}
+	changed, err := store.RefreshTrackedRootSkillHashes(filepath.ToSlash(relPath), repoPath)
+	if err != nil || !changed {
+		return err
+	}
+	return store.Save(sourceDir)
+}
+
+func stringMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, aValue := range a {
+		if b[key] != aValue {
+			return false
+		}
+	}
+	return true
+}
