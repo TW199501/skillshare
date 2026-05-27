@@ -219,6 +219,73 @@ type pushResponse struct {
 	DryRun  bool   `json:"dryRun"`
 }
 
+// handleGitCommit stages and commits changes without pushing.
+func (s *Server) handleGitCommit(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var body pushRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	src := s.cfg.EffectiveSkillsSource()
+
+	if !git.IsRepo(src) {
+		writeError(w, http.StatusBadRequest, "source directory is not a git repository")
+		return
+	}
+
+	status, err := git.GetStatus(src)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get git status: "+err.Error())
+		return
+	}
+	if status == "" {
+		s.writeOpsLog("commit", "ok", start, map[string]any{
+			"summary": "nothing to commit",
+			"dry_run": body.DryRun,
+			"scope":   "ui",
+		}, "")
+		writeJSON(w, pushResponse{Success: true, Message: "nothing to commit (working tree clean)", DryRun: body.DryRun})
+		return
+	}
+
+	if body.DryRun {
+		s.writeOpsLog("commit", "ok", start, map[string]any{
+			"summary": "dry run",
+			"dry_run": true,
+			"scope":   "ui",
+		}, "")
+		writeJSON(w, pushResponse{Success: true, Message: "dry run: would stage and commit changes", DryRun: true})
+		return
+	}
+
+	if err := git.StageAll(src); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to stage changes: "+err.Error())
+		return
+	}
+
+	msg := body.Message
+	if msg == "" {
+		msg = "Update skills"
+	}
+	if err := git.Commit(src, msg); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	s.writeOpsLog("commit", "ok", start, map[string]any{
+		"message": msg,
+		"dry_run": false,
+		"scope":   "ui",
+	}, "")
+
+	writeJSON(w, pushResponse{Success: true, Message: "committed successfully"})
+}
+
 // handlePush stages, commits, and pushes changes
 func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()

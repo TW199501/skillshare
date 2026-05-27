@@ -601,6 +601,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ branch }),
     }),
+  gitCommit: (opts: { message?: string; dryRun?: boolean }) =>
+    apiFetch<PushResponse>('/git/commit', {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    }),
   push: (opts: { message?: string; dryRun?: boolean }) =>
     apiFetch<PushResponse>('/push', {
       method: 'POST',

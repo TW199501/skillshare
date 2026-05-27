@@ -68,6 +68,10 @@ function platformLabel(platform: Platform, t: (key: string) => string): string |
   }
 }
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export default function GitSyncPage() {
   const t = useT();
   const { isProjectMode } = useAppContext();
@@ -79,6 +83,134 @@ export default function GitSyncPage() {
     queryFn: () => api.gitStatus(),
     staleTime: staleTimes.gitStatus,
   });
+
+
+  const { data: branches } = useQuery({
+    queryKey: queryKeys.gitBranches,
+    queryFn: () => api.gitBranches(),
+    staleTime: staleTimes.gitStatus,
+    enabled: !isProjectMode && !!status?.isRepo,
+  });
+
+  const fetchBranchesMutation = useMutation({
+    mutationFn: () => api.gitBranches({ fetch: true }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.gitBranches, data);
+      toast(t('gitSync.toast.branchListRefreshed'), 'info');
+    },
+    onError: (err: unknown) => {
+      toast(errorMessage(err), 'error');
+    },
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: (branch: string) => api.gitCheckout(branch),
+    onSuccess: (res) => {
+      toast(t('gitSync.toast.switchedTo', { branch: res.branch }), 'success');
+      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
+      queryClient.invalidateQueries({ queryKey: queryKeys.gitBranches });
+      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
+    },
+    onError: (err: unknown) => {
+      toast(errorMessage(err), 'error');
+    },
+  });
+
+  const [commitMsg, setCommitMsg] = useState('');
+  const [pushDryRun, setPushDryRun] = useState(false);
+  const [pullDryRun, setPullDryRun] = useState(false);
+  const [committing, setCommitting] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [filesExpanded, setFilesExpanded] = useState(false);
+  const [commitResult, setCommitResult] = useState<string | null>(null);
+  const [pushResult, setPushResult] = useState<string | null>(null);
+  const [pullResult, setPullResult] = useState<PullResponse | null>(null);
+
+  const repoDisabled = !status?.isRepo;
+  const remoteDisabled = !status?.hasRemote;
+
+  // Build branch options for Select
+  const branchOptions: SelectOption[] = [];
+  if (branches) {
+    for (const b of branches.local) {
+      branchOptions.push({ value: b, label: b });
+    }
+    for (const b of branches.remote) {
+      branchOptions.push({ value: b, label: `${b} (remote)`, description: 'Remote-only branch' });
+    }
+  }
+
+  const handleCommit = async () => {
+    setCommitting(true);
+    setCommitResult(null);
+    setPushResult(null);
+    try {
+      const res = await api.gitCommit({ message: commitMsg || undefined, dryRun: pushDryRun });
+      setCommitResult(res.message);
+      if (pushDryRun) {
+        toast(res.message ?? '', 'info');
+      } else {
+        toast(res.message, 'success');
+        setCommitMsg('');
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
+      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
+    } catch (e: unknown) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  const handlePush = async () => {
+    setPushing(true);
+    setCommitResult(null);
+    setPushResult(null);
+    try {
+      const res = await api.push({ message: commitMsg || undefined, dryRun: pushDryRun });
+      setPushResult(res.message);
+      if (pushDryRun) {
+        toast(res.message ?? '', 'info');
+      } else {
+        toast(res.message, 'success');
+        setCommitMsg('');
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
+      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
+    } catch (e: unknown) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setPushing(false);
+    }
+  };
+
+  const handlePull = async () => {
+    setPulling(true);
+    setPullResult(null);
+    try {
+      const res = await api.pull({ dryRun: pullDryRun });
+      setPullResult(res);
+      if (pullDryRun) {
+        toast(res.message || t('gitSync.pull.dryRunComplete'), 'info');
+      } else if (res.upToDate) {
+        toast(t('gitSync.toast.alreadyUpToDate'), 'info');
+      } else {
+        const n = res.commits?.length ?? 0;
+        toast(t('gitSync.pull.pulled', { count: n }), 'success');
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
+      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
+    } catch (e: unknown) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setPulling(false);
+    }
+  };
 
   if (isProjectMode) {
     return (
@@ -103,106 +235,6 @@ export default function GitSyncPage() {
       </div>
     );
   }
-
-  const { data: branches } = useQuery({
-    queryKey: queryKeys.gitBranches,
-    queryFn: () => api.gitBranches(),
-    staleTime: staleTimes.gitStatus,
-    enabled: !!status?.isRepo,
-  });
-
-  const fetchBranchesMutation = useMutation({
-    mutationFn: () => api.gitBranches({ fetch: true }),
-    onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.gitBranches, data);
-      toast(t('gitSync.toast.branchListRefreshed'), 'info');
-    },
-    onError: (err: any) => {
-      toast(err.message, 'error');
-    },
-  });
-
-  const checkoutMutation = useMutation({
-    mutationFn: (branch: string) => api.gitCheckout(branch),
-    onSuccess: (res) => {
-      toast(t('gitSync.toast.switchedTo', { branch: res.branch }), 'success');
-      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
-      queryClient.invalidateQueries({ queryKey: queryKeys.gitBranches });
-      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
-    },
-    onError: (err: any) => {
-      toast(err.message, 'error');
-    },
-  });
-
-  const [commitMsg, setCommitMsg] = useState('');
-  const [pushDryRun, setPushDryRun] = useState(false);
-  const [pullDryRun, setPullDryRun] = useState(false);
-  const [pushing, setPushing] = useState(false);
-  const [pulling, setPulling] = useState(false);
-  const [filesExpanded, setFilesExpanded] = useState(false);
-  const [pushResult, setPushResult] = useState<string | null>(null);
-  const [pullResult, setPullResult] = useState<PullResponse | null>(null);
-
-  const disabled = !status?.isRepo || !status?.hasRemote;
-
-  // Build branch options for Select
-  const branchOptions: SelectOption[] = [];
-  if (branches) {
-    for (const b of branches.local) {
-      branchOptions.push({ value: b, label: b });
-    }
-    for (const b of branches.remote) {
-      branchOptions.push({ value: b, label: `${b} (remote)`, description: 'Remote-only branch' });
-    }
-  }
-
-  const handlePush = async () => {
-    setPushing(true);
-    setPushResult(null);
-    try {
-      const res = await api.push({ message: commitMsg || undefined, dryRun: pushDryRun });
-      setPushResult(res.message);
-      if (pushDryRun) {
-        toast(res.message ?? '', 'info');
-      } else {
-        toast(res.message, 'success');
-        setCommitMsg('');
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
-      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
-    } catch (e: any) {
-      toast(e.message, 'error');
-    } finally {
-      setPushing(false);
-    }
-  };
-
-  const handlePull = async () => {
-    setPulling(true);
-    setPullResult(null);
-    try {
-      const res = await api.pull({ dryRun: pullDryRun });
-      setPullResult(res);
-      if (pullDryRun) {
-        toast(res.message || t('gitSync.pull.dryRunComplete'), 'info');
-      } else if (res.upToDate) {
-        toast(t('gitSync.toast.alreadyUpToDate'), 'info');
-      } else {
-        const n = res.commits?.length ?? 0;
-        toast(t('gitSync.pull.pulled', { count: n }), 'success');
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.gitStatus });
-      queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.overview });
-    } catch (e: any) {
-      toast(e.message, 'error');
-    } finally {
-      setPulling(false);
-    }
-  };
 
   if (isPending) {
     return (
@@ -378,7 +410,7 @@ export default function GitSyncPage() {
       </Card>
 
       {/* Push / Pull Actions */}
-      <Card className={disabled ? 'opacity-50 pointer-events-none' : ''} padding="none">
+      <Card className={repoDisabled ? 'opacity-50 pointer-events-none' : ''} padding="none">
         <div data-tour="git-actions" className="grid grid-cols-1 md:grid-cols-2">
           {/* Push Section */}
           <div className="p-4 flex flex-col">
@@ -421,16 +453,16 @@ export default function GitSyncPage() {
                 </div>
               )}
 
-              {status && !status.isDirty && !pushResult && (
+              {status && !status.isDirty && !commitResult && !pushResult && (
                 <p className="text-sm text-pencil-light">
                   {t('gitSync.noUncommitted')}
                 </p>
               )}
 
-              {pushResult && (
+              {(commitResult || pushResult) && (
                 <p className="text-sm flex items-center gap-1 text-success">
                   <CheckCircle size={14} strokeWidth={2.5} />
-                  {pushResult}
+                  {commitResult || pushResult}
                 </p>
               )}
             </div>
@@ -438,16 +470,28 @@ export default function GitSyncPage() {
             <div className="space-y-3 mt-4 border-t border-dashed border-pencil-light/20 pt-3">
               <div className="flex items-center justify-between gap-4">
                 <Checkbox label={t('gitSync.dryRun')} checked={pushDryRun} onChange={setPushDryRun} />
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handlePush}
-                  loading={pushing}
-                  disabled={!status?.isDirty && !pushDryRun}
-                >
-                  {!pushing && <ArrowUpCircle size={16} strokeWidth={2.5} />}
-                  {pushing ? t('gitSync.actions.pushing') : t('gitSync.actions.push')}
-                </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleCommit}
+                    loading={committing}
+                    disabled={(!status?.isDirty && !pushDryRun) || pushing}
+                  >
+                    {!committing && <GitCommit size={16} strokeWidth={2.5} />}
+                    {committing ? t('gitSync.actions.committing') : t('gitSync.actions.commit')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handlePush}
+                    loading={pushing}
+                    disabled={remoteDisabled || (!status?.isDirty && !pushDryRun) || committing}
+                  >
+                    {!pushing && <ArrowUpCircle size={16} strokeWidth={2.5} />}
+                    {pushing ? t('gitSync.actions.pushing') : t('gitSync.actions.push')}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -520,7 +564,7 @@ export default function GitSyncPage() {
                   size="sm"
                   onClick={handlePull}
                   loading={pulling}
-                  disabled={!!status?.isDirty && !pullDryRun}
+                  disabled={remoteDisabled || (!!status?.isDirty && !pullDryRun)}
                 >
                   {!pulling && <ArrowDownCircle size={16} strokeWidth={2.5} />}
                   {pulling ? t('gitSync.actions.pulling') : t('gitSync.actions.pull')}
