@@ -22,7 +22,7 @@ import { Input } from '../components/Input';
 import { Checkbox } from '../components/Checkbox';
 import { useToast } from '../components/Toast';
 import { api } from '../api/client';
-import type { CheckResult } from '../api/client';
+import type { CheckResult, UpdateResultItem } from '../api/client';
 import { queryKeys, staleTimes } from '../lib/queryKeys';
 import { clearAuditCache } from '../lib/auditCache';
 import { globToRegex } from '../lib/glob';
@@ -370,6 +370,41 @@ export default function UpdatePage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
   }, [queryClient]);
 
+  const applyUpdateResultsToCheckStatuses = useCallback((results: UpdateResultItem[]) => {
+    if (results.length === 0) return;
+
+    setCheckStatuses((prev) => {
+      const next = new Map(prev);
+      const checkedAt = new Date().toISOString();
+
+      for (const result of results) {
+        if (!isSuccessfulUpdateAction(result.action)) continue;
+
+        const status: CheckItemStatus = {
+          status: 'up-to-date',
+          message: result.message,
+          checkedAt,
+        };
+
+        if (result.isRepo) {
+          for (const item of allUpdatableItems) {
+            if (!item.isInRepo) continue;
+            if (item.relPath.split('/')[0] !== result.name) continue;
+            next.set(item.name, status);
+          }
+          continue;
+        }
+
+        const item = allUpdatableItems.find(
+          (candidate) => !candidate.isInRepo && matchesCheckSkill(candidate, result.name),
+        );
+        if (item) next.set(item.name, status);
+      }
+
+      return next;
+    });
+  }, [allUpdatableItems]);
+
   const handleUpdate = useCallback((opts?: { force?: boolean }) => {
     if (selected.size === 0) return;
 
@@ -427,7 +462,8 @@ export default function UpdatePage() {
           }),
         );
       },
-      () => {
+      (data) => {
+        applyUpdateResultsToCheckStatuses(data.results);
         setPhase('done');
         invalidateSkillData();
       },
@@ -437,7 +473,7 @@ export default function UpdatePage() {
       },
       { names, force: opts?.force ?? false },
     );
-  }, [selected, updatableItems, invalidateSkillData, toast]);
+  }, [selected, updatableItems, applyUpdateResultsToCheckStatuses, invalidateSkillData, toast]);
 
   const patchItem = useCallback(
     (name: string, patch: Partial<ItemUpdateStatus>) =>
@@ -457,12 +493,15 @@ export default function UpdatePage() {
             auditRiskLabel: item.auditRiskLabel,
           });
         },
-        () => invalidateSkillData(),
+        (data) => {
+          applyUpdateResultsToCheckStatuses(data.results);
+          invalidateSkillData();
+        },
         (err) => patchItem(name, { status: 'error', message: err.message }),
         { names: [name], force: true },
       );
     },
-    [patchItem, invalidateSkillData],
+    [patchItem, applyUpdateResultsToCheckStatuses, invalidateSkillData],
   );
 
   const handlePurge = useCallback(
@@ -483,7 +522,6 @@ export default function UpdatePage() {
     setPhase('selecting');
     setItemStatuses([]);
     setSelected(new Set());
-    setCheckStatuses(new Map());
     itemRefs.current = {};
   }, []);
 
@@ -979,6 +1017,10 @@ function isStaleError(message?: string): boolean {
 
 function matchesCheckSkill(item: UpdatableItem, resultName: string): boolean {
   return item.name === resultName || item.flatName === resultName || item.relPath === resultName;
+}
+
+function isSuccessfulUpdateAction(action: string): boolean {
+  return action === 'updated' || action === 'up-to-date';
 }
 
 function actionToStatus(action: string): ItemUpdateStatus['status'] {
