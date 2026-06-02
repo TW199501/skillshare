@@ -22,6 +22,23 @@ All notable changes to skillshare are documented here. For the full commit histo
   ```
   The index path inside the repo comes from the `//path` suffix and defaults to `skillshare-hub.json` at the repo root. Both scp-style (`git@host:org/repo.git`) and scheme-style (`ssh://git@host/org/repo.git`) URLs work. In the web dashboard, SSH hub sources must be saved first — the server only clones saved hubs.
 
+#### Extras per-target management
+
+- **Add or remove a single target on an existing extra** — `extras <name> --add-target` and `--remove-target` manage one target without recreating the whole extra. Both update config only; run `skillshare sync extras` afterward to apply:
+  ```bash
+  skillshare extras rules --add-target ~/.cursor/rules --mode copy
+  skillshare extras rules --remove-target ~/.cursor/rules
+  ```
+  Removing a target leaves already-synced files in place by default. Add `--prune` to also delete the skillshare-managed files under that target — in merge mode only symlinks are removed, so your own files are preserved. Removing the last remaining target is rejected (use `extras remove <name>` for the whole extra). The web dashboard's Extras page gains matching per-target add/remove controls.
+
+### Breaking Changes
+
+- **Removed the `extras mode` subcommand** — change a target's sync mode or flatten setting with the `extras <name>` shorthand instead (same behavior, one less command):
+  ```bash
+  skillshare extras rules --mode copy --target ~/.claude/rules
+  skillshare extras agents --flatten
+  ```
+
 ## [0.20.3] - 2026-06-01
 
 ### New Features
