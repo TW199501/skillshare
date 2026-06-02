@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.20.5] - 2026-06-03
+
+### New Features
+
+- **Zed editor target** — `zed` is now a supported sync target. Add it, then sync; skills go to `~/.agents/skills` (global) and `.agents/skills` (project):
+  ```bash
+  skillshare target add zed
+  skillshare sync
+  ```
+
+### Bug Fixes
+
+- Fixed disabled skills failing to uninstall from the web dashboard — a skill disabled via `.skillignore` still appeared in the dashboard list but couldn't be removed, reporting "skill not found". Uninstall now resolves disabled skills the same way the list does. The CLI was unaffected.
+
 ## [0.20.4] - 2026-06-02
 
 ### New Features
