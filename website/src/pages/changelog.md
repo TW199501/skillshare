@@ -9,6 +9,18 @@ All notable changes to skillshare are documented here. For the full commit histo
 
 ---
 
+## [0.20.6] - 2026-06-03
+
+### New Features
+
+- **Clearer hub errors in the web dashboard** — when a hub fails to load, the Search page now names the failing hub and explains the likely cause (malformed URL, missing index file, authentication required, or invalid JSON) instead of showing a bare `HTTP 400`.
+
+### Bug Fixes
+
+- Fixed the skill preview showing only index metadata (name, description, tags) for skills from non-github.com hubs — the web dashboard always fetched `SKILL.md` via `api.github.com`, so GitHub Enterprise, GitLab, and other sources never rendered their full content. The preview now reads from the source's own host (the GHE Contents API, or a shallow clone for other platforms), and degrades with a clear notice when a source genuinely can't be fetched.
+- Fixed the hub selector dropdown being clipped behind the search box on the dashboard's Search page.
+- Fixed `skillshare audit` ignoring `.skillignore` inside tracked hub repos — skills excluded via a tracked repo's `.skillignore` were still scanned and reported. Audit now skips those skills, matching how sync and the rest of the CLI treat them.
+
 ## [0.20.5] - 2026-06-03
 
 ### New Features
