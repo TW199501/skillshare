@@ -925,6 +925,7 @@
   "search.empty.start.title": "検索を開始",
   "search.githubTokenHint": "GitHub API アクセスには GITHUB_TOKEN 環境変数が必要です。",
   "search.hub.addHubFirst": "先にハブソースを追加してください",
+  "search.hub.loadFailed": "Hub「{hub}」を読み込めませんでした",
   "search.hub.manageButton": "管理",
   "search.hub.manageHubsButton": "ハブを管理",
   "search.hub.noHubsConfigured": "ハブが設定されていません。追加して開始してください。",

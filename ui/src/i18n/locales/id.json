@@ -925,6 +925,7 @@
   "search.empty.start.title": "Mulai mencari",
   "search.githubTokenHint": "Memerlukan variabel lingkungan GITHUB_TOKEN untuk akses GitHub API.",
   "search.hub.addHubFirst": "Tambahkan sumber hub terlebih dahulu",
+  "search.hub.loadFailed": "Tidak dapat memuat hub \"{hub}\"",
   "search.hub.manageButton": "Kelola",
   "search.hub.manageHubsButton": "Kelola Hub",
   "search.hub.noHubsConfigured": "Tidak ada hub yang dikonfigurasi. Tambahkan satu untuk memulai.",

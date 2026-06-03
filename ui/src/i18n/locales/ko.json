@@ -925,6 +925,7 @@
   "search.empty.start.title": "검색 시작",
   "search.githubTokenHint": "GitHub API 접근을 위해 GITHUB_TOKEN 환경 변수가 필요합니다.",
   "search.hub.addHubFirst": "먼저 허브 소스를 추가하세요",
+  "search.hub.loadFailed": "Hub \"{hub}\"을(를) 불러올 수 없습니다",
   "search.hub.manageButton": "관리",
   "search.hub.manageHubsButton": "허브 관리",
   "search.hub.noHubsConfigured": "설정된 허브가 없습니다. 하나를 추가하여 시작하세요.",

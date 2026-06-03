@@ -50,7 +50,7 @@ func SearchFromIndexURL(query string, limit int, indexURL string) ([]SearchResul
 func SearchFromIndexJSON(query string, limit int, data []byte) ([]SearchResult, error) {
 	var doc indexDocument
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("parse hub: %w", err)
+		return nil, invalidHubJSONError("", err)
 	}
 	return searchIndex(query, limit, &doc)
 }
@@ -137,6 +137,16 @@ func isRelativeSource(source string) bool {
 	return true
 }
 
+// invalidHubJSONError wraps a JSON decode failure with guidance that the
+// fetched content is not a valid skillshare-hub.json file. A common cause is a
+// URL that returns an HTML error page (e.g. a 404 page) instead of raw JSON.
+func invalidHubJSONError(source string, err error) error {
+	if strings.TrimSpace(source) == "" {
+		return fmt.Errorf("hub index is not valid JSON — expected a skillshare-hub.json file: %w", err)
+	}
+	return fmt.Errorf("hub index at %s is not valid JSON — expected a skillshare-hub.json file (the URL may return an HTML page instead of raw JSON): %w", source, err)
+}
+
 func loadIndex(indexURL string) (*indexDocument, error) {
 	s := strings.TrimSpace(indexURL)
 	if s == "" {
@@ -158,7 +168,7 @@ func loadIndex(indexURL string) (*indexDocument, error) {
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("fetch hub: %w", err)
+			return nil, fmt.Errorf("could not reach hub %s: %w", s, err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
@@ -166,7 +176,7 @@ func loadIndex(indexURL string) (*indexDocument, error) {
 		}
 		var doc indexDocument
 		if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
-			return nil, fmt.Errorf("parse hub: %w", err)
+			return nil, invalidHubJSONError(req.URL.String(), err)
 		}
 		return &doc, nil
 	}
@@ -174,11 +184,11 @@ func loadIndex(indexURL string) (*indexDocument, error) {
 	rawPath := strings.TrimPrefix(s, "file://")
 	data, err := os.ReadFile(rawPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read local hub file %q: %w — check the path exists and points to a skillshare-hub.json file", rawPath, err)
 	}
 	var doc indexDocument
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("parse hub: %w", err)
+		return nil, invalidHubJSONError(rawPath, err)
 	}
 	return &doc, nil
 }
@@ -216,11 +226,11 @@ func readIndexFromGitClone(cloneURL, relPath string) (*indexDocument, error) {
 
 	data, err := os.ReadFile(filepath.Join(dir, clean))
 	if err != nil {
-		return nil, fmt.Errorf("read hub index %q from repo: %w", relPath, err)
+		return nil, fmt.Errorf("hub index %q not found in repo %s: %w", relPath, cloneURL, err)
 	}
 	var doc indexDocument
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("parse hub: %w", err)
+		return nil, invalidHubJSONError(relPath, err)
 	}
 	return &doc, nil
 }
@@ -345,20 +355,28 @@ func applyHubAuthHeaders(req *http.Request) {
 	}
 }
 
+// hubHTTPError converts a non-200 hub fetch response into an actionable error.
+// The message names the likely cause and includes the URL so the user can see
+// which hub failed and how to fix it, rather than a bare "HTTP <code>".
 func hubHTTPError(indexURL string, status int) error {
-	if status != http.StatusUnauthorized && status != http.StatusForbidden {
-		return fmt.Errorf("fetch hub: HTTP %d", status)
-	}
-
-	switch install.DetectPlatformForURL(indexURL) {
-	case install.PlatformGitLab:
-		return fmt.Errorf("fetch hub: HTTP %d (authentication required; set GITLAB_TOKEN or SKILLSHARE_GIT_TOKEN)", status)
-	case install.PlatformGitHub:
-		return fmt.Errorf("fetch hub: HTTP %d (authentication required; set GITHUB_TOKEN or SKILLSHARE_GIT_TOKEN)", status)
-	case install.PlatformBitbucket:
-		return fmt.Errorf("fetch hub: HTTP %d (authentication required; set BITBUCKET_TOKEN or SKILLSHARE_GIT_TOKEN)", status)
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		switch install.DetectPlatformForURL(indexURL) {
+		case install.PlatformGitLab:
+			return fmt.Errorf("could not fetch hub (HTTP %d) from %s — authentication required; set GITLAB_TOKEN or SKILLSHARE_GIT_TOKEN", status, indexURL)
+		case install.PlatformGitHub:
+			return fmt.Errorf("could not fetch hub (HTTP %d) from %s — authentication required; set GITHUB_TOKEN or SKILLSHARE_GIT_TOKEN", status, indexURL)
+		case install.PlatformBitbucket:
+			return fmt.Errorf("could not fetch hub (HTTP %d) from %s — authentication required; set BITBUCKET_TOKEN or SKILLSHARE_GIT_TOKEN", status, indexURL)
+		default:
+			return fmt.Errorf("could not fetch hub (HTTP %d) from %s — authentication required", status, indexURL)
+		}
+	case http.StatusNotFound:
+		return fmt.Errorf("hub index not found (HTTP 404) at %s — check the URL points to a raw skillshare-hub.json file", indexURL)
+	case http.StatusBadRequest:
+		return fmt.Errorf("hub URL looks malformed (HTTP 400): %s — it should point to a raw skillshare-hub.json file, e.g. https://raw.githubusercontent.com/<owner>/<repo>/<branch>/skillshare-hub.json", indexURL)
 	default:
-		return fmt.Errorf("fetch hub: HTTP %d (authentication required)", status)
+		return fmt.Errorf("could not fetch hub (HTTP %d) from %s", status, indexURL)
 	}
 }
 

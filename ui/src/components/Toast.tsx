@@ -6,11 +6,16 @@ interface Toast {
   id: number;
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
+  title?: string;
   exiting?: boolean;
 }
 
+interface ToastOptions {
+  title?: string;
+}
+
 interface ToastContextValue {
-  toast: (message: string, type?: Toast['type']) => void;
+  toast: (message: string, type?: Toast['type'], opts?: ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -101,7 +106,10 @@ function ToastItem({
       onMouseLeave={() => { setPaused(false); startTimer(); }}
     >
       <Icon size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
-      <span className="flex-1 whitespace-pre-line break-words leading-relaxed">{t.message}</span>
+      <div className="flex-1 min-w-0">
+        {t.title && <p className="font-bold break-words leading-snug">{t.title}</p>}
+        <span className="block whitespace-pre-line break-words leading-relaxed">{t.message}</span>
+      </div>
       <button
         onClick={() => startExit()}
         className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
@@ -124,9 +132,9 @@ function ToastItem({
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = useCallback((message: string, type: Toast['type'] = 'info') => {
+  const addToast = useCallback((message: string, type: Toast['type'] = 'info', opts?: ToastOptions) => {
     const id = nextId++;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type, title: opts?.title }]);
   }, []);
 
   const removeToast = useCallback((id: number) => {

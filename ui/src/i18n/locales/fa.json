@@ -925,6 +925,7 @@
   "search.empty.start.title": "جستجو را شروع کنید",
   "search.githubTokenHint": "برای دسترسی به GitHub API نیاز به متغیر محیطی GITHUB_TOKEN دارد.",
   "search.hub.addHubFirst": "ابتدا یک منبع hub اضافه کنید",
+  "search.hub.loadFailed": "بارگیری هاب «{hub}» ممکن نشد",
   "search.hub.manageButton": "مدیریت",
   "search.hub.manageHubsButton": "مدیریت Hubها",
   "search.hub.noHubsConfigured": "هیچ hubی پیکربندی نشده. برای شروع یکی اضافه کنید.",

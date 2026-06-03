@@ -177,7 +177,16 @@ export default function SearchPage() {
         toast(q ? t('search.results.noResultsFound') : t('search.results.noSkillsFound'), 'info');
       }
     } catch (e: unknown) {
-      toast((e as Error).message, 'error');
+      const message = (e as Error).message;
+      if (mode === 'hub') {
+        // Name the failing hub so the error isn't just a bare "HTTP 400".
+        const hub = savedHubs.find((h) => h.url === selectedHub);
+        toast(message, 'error', {
+          title: t('search.hub.loadFailed', { hub: hub?.label || selectedHub }),
+        });
+      } else {
+        toast(message, 'error');
+      }
     } finally {
       setSearching(false);
     }

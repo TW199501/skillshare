@@ -850,6 +850,7 @@
   "search.empty.start.description.hub": "Type a query above, or search with empty query to browse all",
   "search.empty.start.title": "Start searching",
   "search.hub.addHubFirst": "Add a hub source first",
+  "search.hub.loadFailed": "Couldn't load hub \"{hub}\"",
   "search.hub.manageButton": "Manage",
   "search.hub.manageHubsButton": "Manage Hubs",
   "search.hub.noHubsConfigured": "No hubs configured. Add one to get started.",

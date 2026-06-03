@@ -431,11 +431,33 @@ func TestHubHTTPError_AuthHints(t *testing.T) {
 }
 
 func TestHubHTTPError_NonAuthStatus(t *testing.T) {
-	err := hubHTTPError("https://gitlab.com/group/repo/-/raw/main/skillshare-hub.json", 404)
+	url := "https://gitlab.com/group/repo/-/raw/main/skillshare-hub.json"
+
+	// 404: names the cause and includes the URL so the user knows which hub failed.
+	err := hubHTTPError(url, 404)
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}
-	if err.Error() != "fetch hub: HTTP 404" {
-		t.Fatalf("error = %q, want plain HTTP status", err.Error())
+	for _, want := range []string{"404", "not found", url} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("404 error = %q, want substring %q", err.Error(), want)
+		}
+	}
+
+	// 400: typically a malformed URL — guide the user toward a raw JSON URL.
+	err = hubHTTPError("https://raw.githubusercontent.com/runkids", 400)
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	for _, want := range []string{"400", "skillshare-hub.json"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("400 error = %q, want substring %q", err.Error(), want)
+		}
+	}
+
+	// Other statuses still include the code and URL.
+	err = hubHTTPError(url, 500)
+	if err == nil || !strings.Contains(err.Error(), "500") || !strings.Contains(err.Error(), url) {
+		t.Fatalf("500 error = %v, want code and URL", err)
 	}
 }

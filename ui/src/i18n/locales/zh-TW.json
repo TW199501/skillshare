@@ -925,6 +925,7 @@
   "search.empty.start.title": "開始搜尋",
   "search.githubTokenHint": "需要 GITHUB_TOKEN 環境變數以存取 GitHub API。",
   "search.hub.addHubFirst": "請先新增 hub 來源",
+  "search.hub.loadFailed": "無法載入 Hub「{hub}」",
   "search.hub.manageButton": "管理",
   "search.hub.manageHubsButton": "管理 Hubs",
   "search.hub.noHubsConfigured": "尚未設定任何 hub。新增一個以開始使用。",

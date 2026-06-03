@@ -925,6 +925,7 @@
   "search.empty.start.title": "Comece a buscar",
   "search.githubTokenHint": "Requer a variável de ambiente GITHUB_TOKEN para acesso à API do GitHub.",
   "search.hub.addHubFirst": "Adicione uma fonte de hub primeiro",
+  "search.hub.loadFailed": "Não foi possível carregar o hub \"{hub}\"",
   "search.hub.manageButton": "Gerenciar",
   "search.hub.manageHubsButton": "Gerenciar Hubs",
   "search.hub.noHubsConfigured": "Nenhum hub configurado. Adicione um para começar.",
