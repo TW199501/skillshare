@@ -9,6 +9,17 @@ All notable changes to skillshare are documented here. For the full commit histo
 
 ---
 
+## [0.20.10] - 2026-06-10
+
+### Bug Fixes
+
+- **Missing tracked repositories are no longer silently ignored** — when `.metadata.json` declares a tracked repo but the local `_repo/` clone is missing (common after a fresh clone on another machine), `status`, `check`, `update --all`, and `doctor` now report it as missing instead of showing no tracked repos. The message points to the existing recovery path:
+  ```bash
+  skillshare install
+  skillshare sync
+  ```
+  `update --all --json` now counts the missing repo as skipped and includes an item explaining the recovery step. Refs: #212.
+
 ## [0.20.9] - 2026-06-05
 
 ### New Features
