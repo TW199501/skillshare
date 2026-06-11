@@ -405,6 +405,16 @@ export const api = {
     }, onError, 'Update stream failed');
   },
 
+  // Tracked repos declared in metadata but absent on disk (issue #212)
+  missingTrackedRepos: () =>
+    apiFetch<{ repos: MissingTrackedRepo[] }>('/update/missing-tracked-repos'),
+
+  // Rehydrate tracked repos declared in metadata but absent on disk (issue #212)
+  rehydrateTrackedRepos: () =>
+    apiFetch<{ results: RehydrateResultItem[] }>('/update/rehydrate', {
+      method: 'POST',
+    }),
+
   // Repo uninstall
   deleteRepo: (name: string) =>
     apiFetch<{ success: boolean; name: string }>(`/repos/${encodeURIComponent(name)}`, { method: 'DELETE' }),
@@ -913,12 +923,25 @@ export interface UpdateResultItem {
   auditRiskLabel?: string;
 }
 
+export interface MissingTrackedRepo {
+  name: string;
+  source: string;
+  branch?: string;
+}
+
 export interface UpdateStreamSummary {
   updated: number;
   upToDate: number;
   blocked: number;
   errors: number;
   skipped: number;
+  missingTrackedRepos?: MissingTrackedRepo[];
+}
+
+export interface RehydrateResultItem {
+  name: string;
+  action: string; // "rehydrated" | "error"
+  error?: string;
 }
 
 export interface AvailableTarget {
