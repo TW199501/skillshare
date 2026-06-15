@@ -9,6 +9,13 @@ All notable changes to skillshare are documented here. For the full commit histo
 
 ---
 
+## [0.20.17] - 2026-06-15
+
+### Bug Fixes
+
+- **`update --all` no longer crashes on unreadable metadata** — when `.metadata.json` is corrupt or unreadable, update now reports a metadata warning and continues scanning local skills instead of panicking with a stack trace.
+- **Project root installs are rejected before copying into themselves** — `skillshare install ./ -p` now fails with a clear message telling users to install a skill subdirectory, preventing `.skillshare/skills` from recursively copying into itself on Windows.
+
 ## [0.20.16] - 2026-06-15
 
 ### Bug Fixes
