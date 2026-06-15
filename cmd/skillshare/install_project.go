@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"skillshare/internal/install"
 	"skillshare/internal/ui"
@@ -67,6 +69,9 @@ func cmdInstallProjectParsed(parsed *installArgs, root string) (installLogSummar
 	if err != nil {
 		return summary, err
 	}
+	if err := rejectProjectRootLocalInstall(source, root); err != nil {
+		return summary, err
+	}
 
 	if resolvedFromMeta {
 		summary, err = handleDirectInstall(source, cfg, parsed.opts)
@@ -102,6 +107,32 @@ func cmdInstallProjectParsed(parsed *installArgs, root string) (installLogSummar
 	}
 
 	return summary, reconcileProjectRemoteSkills(runtime)
+}
+
+func rejectProjectRootLocalInstall(source *install.Source, root string) error {
+	if source == nil || source.Type != install.SourceTypeLocalPath {
+		return nil
+	}
+	sourcePath, err := filepath.Abs(source.Path)
+	if err != nil {
+		return fmt.Errorf("invalid source path: %w", err)
+	}
+	projectRoot, err := filepath.Abs(root)
+	if err != nil {
+		return fmt.Errorf("invalid project root: %w", err)
+	}
+	sourcePath, err = filepath.EvalSymlinks(sourcePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("cannot resolve source path: %w", err)
+		}
+	} else if resolvedRoot, rootErr := filepath.EvalSymlinks(projectRoot); rootErr == nil {
+		projectRoot = resolvedRoot
+	}
+	if sourcePath == projectRoot {
+		return fmt.Errorf("cannot install the project root into itself; specify a skill subdirectory instead (for example: skillshare install ./my-skill -p)")
+	}
+	return nil
 }
 
 func installFromProjectConfig(runtime *projectRuntime, opts install.InstallOptions) (installLogSummary, error) {
