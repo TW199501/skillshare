@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -152,6 +153,121 @@ func cloneRepo(url, destPath, branch string, shallow bool, onProgress ProgressCa
 	}
 	args = append(args, url, destPath)
 	return runGitCommandWithProgress(args, "", authEnv(url), onProgress)
+}
+
+func cloneRepoForSource(source *Source, destPath, branch string, shallow bool, onProgress ProgressCallback) error {
+	err := cloneRepo(source.CloneURL, destPath, branch, shallow, onProgress)
+	if err == nil {
+		return nil
+	}
+	if !shouldRetryNestedGitLabURL(err) {
+		return err
+	}
+
+	var lastErr error
+	for _, fallback := range cloneFallbackSourcesForNestedGitLabURL(source) {
+		if cleanupErr := removeAll(destPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			return fmt.Errorf("clone failed (%v), and cleanup before fallback failed: %w", err, cleanupErr)
+		}
+		if onProgress != nil {
+			onProgress("Clone failed; retrying as a nested GitLab repository...")
+		}
+		fallbackErr := cloneRepo(fallback.CloneURL, destPath, branch, shallow, onProgress)
+		if fallbackErr == nil {
+			*source = fallback
+			return nil
+		}
+		lastErr = fallbackErr
+	}
+
+	if lastErr != nil {
+		return fmt.Errorf("%w (nested GitLab fallback also failed: %v)", err, lastErr)
+	}
+	return err
+}
+
+func shouldRetryNestedGitLabURL(err error) bool {
+	if err == nil {
+		return false
+	}
+	if IsAuthError(err.Error()) || IsSSLError(err.Error()) {
+		return false
+	}
+
+	low := strings.ToLower(err.Error())
+	blockedHints := []string{
+		"remote branch",
+		"could not resolve host",
+		"failed to connect",
+		"connection timed out",
+		"operation timed out",
+		"network is unreachable",
+		"permission denied",
+	}
+	for _, hint := range blockedHints {
+		if strings.Contains(low, hint) {
+			return false
+		}
+	}
+
+	retryHints := []string{
+		"repository not found",
+		"not a git repository",
+		"not a valid git repo",
+		"does not appear to be a git repository",
+		"requested url returned error: 404",
+	}
+	for _, hint := range retryHints {
+		if strings.Contains(low, hint) {
+			return true
+		}
+	}
+	if strings.Contains(low, "repository") && strings.Contains(low, "not found") {
+		return true
+	}
+	return false
+}
+
+func cloneFallbackSourcesForNestedGitLabURL(source *Source) []Source {
+	if source == nil || source.Type != SourceTypeGitHTTPS || source.Subdir == "" {
+		return nil
+	}
+
+	u, err := url.Parse(source.CloneURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return nil
+	}
+
+	repoPath := strings.Trim(strings.TrimSuffix(u.Path, ".git"), "/")
+	if repoPath == "" || strings.Contains(repoPath, "/-/") {
+		return nil
+	}
+
+	subdirParts := strings.Split(strings.Trim(source.Subdir, "/"), "/")
+	if len(subdirParts) == 0 {
+		return nil
+	}
+
+	fallbacks := make([]Source, 0, len(subdirParts))
+	for i := 1; i <= len(subdirParts); i++ {
+		candidate := *source
+		candidateRepoPath := repoPath + "/" + strings.Join(subdirParts[:i], "/")
+		remaining := strings.Join(subdirParts[i:], "/")
+
+		candidateURL := *u
+		candidateURL.Path = "/" + candidateRepoPath + ".git"
+		candidate.CloneURL = candidateURL.String()
+		candidate.Subdir = remaining
+		if remaining == "" {
+			candidate.Name = filepath.Base(candidateRepoPath)
+		} else {
+			candidate.Name = filepath.Base(remaining)
+		}
+
+		fallbacks = append(fallbacks, candidate)
+	}
+
+	return fallbacks
 }
 
 // ShallowCloneToTemp clones cloneURL into a fresh temporary directory using a
